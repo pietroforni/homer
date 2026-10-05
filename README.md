@@ -7,7 +7,7 @@ English, and leaves the final decision with me.
 It is not trying to replace the shell. It is just a careful helper for getting from an intention
 to a command I can inspect.
 
-![Homer turning a question about port 8000 into a reviewed lsof command](assets/terminal-demo.svg)
+![Homer turning a project-folder request into a reviewed find command](assets/terminal-demo.svg)
 
 ## How it works
 
