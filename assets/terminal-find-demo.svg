@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="390" viewBox="0 0 960 390" role="img" aria-labelledby="title description">
-  <title id="title">A Homer dry run in the terminal</title>
+  <title id="title">Finding recently changed Python files with Homer</title>
   <desc id="description">Homer consults the local find manual and turns a project-folder question into an explained command without executing it.</desc>
   <rect width="960" height="390" rx="14" fill="#101216"/>
   <path d="M0 48h960" stroke="#2b3038"/>

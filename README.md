@@ -7,7 +7,7 @@ English, and leaves the final decision with me.
 It is not trying to replace the shell. It is just a careful helper for getting from an intention
 to a command I can inspect.
 
-![Homer turning a project-folder request into a reviewed find command](assets/terminal-demo.svg)
+![Homer turning a project-folder request into a reviewed find command](assets/terminal-find-demo.svg)
 
 ## How it works
 
@@ -57,6 +57,8 @@ homer write "Draft a short project update"
 homer write --input article.md --output revised.md "Make this clearer"
 homer write --style-guide ./my-style.md "Draft a concise introduction"
 ```
+
+![Homer drafting a three-sentence story with the local model](assets/writing-demo.svg)
 
 Homer uses a simple built-in style guide unless you provide one. Existing output files are kept
 unless you explicitly add `--force`.
