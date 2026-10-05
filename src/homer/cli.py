@@ -109,6 +109,10 @@ def _show_proposal(proposal: CommandProposal) -> None:
     console.print(Syntax(proposal.command, "bash", word_wrap=True))
     console.print("\n[bold]Explanation[/]")
     console.print(Text(proposal.explanation))
+    if proposal.manuals:
+        console.print(f"[dim]Consulted local manuals: {', '.join(proposal.manuals)}[/]")
+    if proposal.manual_warning:
+        console.print("[yellow]Manual warning:[/]", Text(proposal.manual_warning))
     for warning in proposal.warnings:
         console.print("[yellow]Model warning:[/]", Text(warning))
 

@@ -11,12 +11,13 @@ to a command I can inspect.
 
 ## How it works
 
-Homer proposes one macOS shell command, explains it, and checks its syntax and risk level. Safe and
-caution-level commands still wait for `Execute? [y/N]`. Recognized high-risk commands are blocked
-without an override.
+Homer drafts one macOS shell command, consults the relevant manuals installed on your Mac, and asks
+the local model to correct unsupported syntax. It then explains the result and checks its syntax
+and risk level. Safe and caution-level commands still wait for `Execute? [y/N]`. Recognized
+high-risk commands are blocked without an override.
 
-Everything goes through Ollama at `localhost`; Homer has no cloud fallback, background service, or
-saved prompt history.
+The manual lookup and model requests stay on your machine. Homer has no cloud fallback, background
+service, bundled manual snapshot, or saved prompt history.
 
 ## Install
 

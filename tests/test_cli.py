@@ -34,7 +34,7 @@ def test_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "homer 0.2.0" in result.stdout
+    assert "homer 0.3.0" in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -61,6 +61,25 @@ def test_direct_request_supports_dry_run() -> None:
     assert "Proposed command" in result.stdout
     assert "Dry run" in result.stdout
     propose.assert_called_once_with("where am I")
+
+
+def test_consulted_manuals_are_shown() -> None:
+    proposal = CommandProposal("find .", "List files.", (), ("find",))
+    with patch("homer.cli.ShellAssistant.propose", return_value=proposal):
+        result = runner.invoke(app, ["--dry-run", "find files"])
+
+    assert result.exit_code == 0
+    assert "Consulted local manuals: find" in result.stdout
+
+
+def test_manual_warning_is_distinct_from_model_warning() -> None:
+    proposal = CommandProposal("find .", "List files.", (), manual_warning="Manual unavailable.")
+    with patch("homer.cli.ShellAssistant.propose", return_value=proposal):
+        result = runner.invoke(app, ["--dry-run", "find files"])
+
+    assert result.exit_code == 0
+    assert "Manual warning: Manual unavailable." in all_output(result)
+    assert "Model warning" not in result.stdout
 
 
 def test_request_can_be_cancelled() -> None:

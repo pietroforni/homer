@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="390" viewBox="0 0 960 390" role="img" aria-labelledby="title description">
   <title id="title">A Homer dry run in the terminal</title>
-  <desc id="description">Homer turns a question about port 8000 into an explained lsof command without executing it.</desc>
+  <desc id="description">Homer consults the local lsof manual and turns a question about port 8000 into an explained command without executing it.</desc>
   <rect width="960" height="390" rx="14" fill="#101216"/>
   <path d="M0 48h960" stroke="#2b3038"/>
   <text x="28" y="31" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">terminal — homer</text>
@@ -10,8 +10,9 @@
     <text x="28" y="138" fill="#d2a8ff" font-weight="600">Proposed command</text>
     <rect x="28" y="157" width="904" height="46" rx="7" fill="#171a20"/>
     <text x="44" y="187" fill="#a5d6a7">lsof -i :8000</text>
-    <text x="28" y="246" fill="#d2a8ff" font-weight="600">Explanation</text>
-    <text x="28" y="279" fill="#c9d1d9">List files associated with the process using port 8000.</text>
-    <text x="28" y="330" fill="#79c0ff">Dry run: command was not executed.</text>
+    <text x="28" y="242" fill="#d2a8ff" font-weight="600">Explanation</text>
+    <text x="28" y="275" fill="#c9d1d9">List files associated with the process using port 8000.</text>
+    <text x="28" y="310" fill="#8b949e">Consulted local manuals: lsof</text>
+    <text x="28" y="360" fill="#79c0ff">Dry run: command was not executed.</text>
   </g>
 </svg>
