@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,10 +12,11 @@ from homer.shell_assistant import CommandProposal
 
 runner = CliRunner()
 SAFE = CommandProposal("pwd", "Print the working directory.", ())
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 def all_output(result: object) -> str:
-    return result.stdout + result.stderr  # type: ignore[attr-defined]
+    return ANSI_ESCAPE.sub("", result.stdout + result.stderr)  # type: ignore[attr-defined]
 
 
 def test_help_presents_direct_workflow_and_secondary_commands() -> None:
