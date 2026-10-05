@@ -1,9 +1,0 @@
-# Optional user configuration. Copy to ~/.config/homer/config.yaml.
-model: qwen2.5:7b
-ollama_host: http://localhost:11434
-timeout_seconds: 60
-context_tokens: 8192
-
-# Writing mode uses a packaged default when this is omitted.
-# Relative paths start from the directory containing this file.
-# style_guide: ./style_guide.md

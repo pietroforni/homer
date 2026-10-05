@@ -1,70 +1,55 @@
 # Homer
 
-[![CI](https://github.com/pietroforni/homer/actions/workflows/ci.yml/badge.svg)](https://github.com/pietroforni/homer/actions/workflows/ci.yml)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
-[![macOS](https://img.shields.io/badge/platform-macOS-000000.svg)](https://www.apple.com/macos/)
-[![MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+Homer is a small side project I built for the moments when I know what I want the terminal to do,
+but cannot remember the exact command. It asks a local Ollama model, shows me the command in plain
+English, and leaves the final decision with me.
 
-Homer turns plain-English requests into reviewed shell commands using a model running locally
-through [Ollama](https://ollama.com/). It shows the exact command and an explanation, checks the
-syntax and risk level, and waits for your confirmation before running anything.
+It is not trying to replace the shell. It is just a careful helper for getting from an intention
+to a command I can inspect.
 
-![A Homer dry-run proposing and explaining a disk-usage command](docs/assets/demo.svg)
+![Homer turning a question about port 8000 into a reviewed lsof command](assets/terminal-demo.svg)
 
-## Why Homer?
+## How it works
 
-- **Local by default.** Requests go to Ollama on your Mac, not a hosted AI service.
-- **Confirmation first.** Homer never runs a proposed command without an explicit `y`.
-- **Conservative.** Malformed commands are rejected and high-risk patterns are always blocked.
-- **Small.** One focused CLI, one local model connection, and no background process.
+Homer proposes one macOS shell command, explains it, and checks its syntax and risk level. Safe and
+caution-level commands still wait for `Execute? [y/N]`. Recognized high-risk commands are blocked
+without an override.
+
+Everything goes through Ollama at `localhost`; Homer has no cloud fallback, background service, or
+saved prompt history.
 
 ## Install
 
-Homer requires macOS, Python 3.10 or newer, and [Ollama for macOS](https://ollama.com/download).
-Start Ollama and download the default model:
+You need macOS, Python 3.10 or newer, [uv](https://docs.astral.sh/uv/), and
+[Ollama](https://ollama.com/download). Start Ollama and download the default model:
 
 ```zsh
 ollama pull qwen2.5:7b
 ```
 
-Install Homer directly from GitHub with [uv](https://docs.astral.sh/uv/):
+Install Homer from GitHub and check the setup:
 
 ```zsh
 uv tool install git+https://github.com/pietroforni/homer
-```
-
-Alternatively, use pipx:
-
-```zsh
-pipx install git+https://github.com/pietroforni/homer
-```
-
-Verify the setup:
-
-```zsh
 homer doctor
 ```
 
 ## Use
 
-Ask for a command:
-
 ```zsh
 homer "show the ten largest files in Downloads"
+homer --dry-run "make a tar.gz archive of the Reports folder"
 ```
 
-Preview without any possibility of execution:
+Use another installed Ollama model for a single request with `--model`:
 
 ```zsh
-homer --dry-run "compress the Reports folder as a tar.gz archive"
+homer --model qwen2.5:3b "find JPEG files changed this week"
 ```
 
-Run `homer` without a request to enter an in-memory interactive session. Use `/exit`,
-`Ctrl-C`, or `Ctrl-D` to leave.
+### A small writing helper
 
-### Optional writing mode
-
-Homer also includes a secondary local writing assistant:
+Writing is deliberately secondary, but useful for quick local drafts and edits:
 
 ```zsh
 homer write "Draft a short project update"
@@ -72,17 +57,14 @@ homer write --input article.md --output revised.md "Make this clearer"
 homer write --style-guide ./my-style.md "Draft a concise introduction"
 ```
 
-Writing mode uses a small packaged style guide unless you provide your own. It never replaces an
-existing output file unless `--force` is supplied.
+Homer uses a simple built-in style guide unless you provide one. Existing output files are kept
+unless you explicitly add `--force`.
 
-## Safety and privacy
+## A note on safety
 
-Homer validates proposed commands with zsh and a conservative parser. Commands involving broad
-deletion, privilege escalation, disk formatting, remote scripts piped into a shell, dynamic shell
-evaluation, or similar high-risk behavior are blocked with no override.
-
-Safety classification is a guardrail, not a proof. Read every command before confirming it. See
-[the safety model](docs/safety.md) and [configuration reference](docs/configuration.md) for details.
+The checks are conservative guardrails, not proof that a generated command is harmless. Read the
+command before typing `y`, check quoted paths, and use `--dry-run` whenever you are unsure. See
+[SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Develop
 
@@ -95,8 +77,8 @@ uv run pytest
 uv build
 ```
 
-The committed `uv.lock` keeps development and CI reproducible. Runtime dependencies remain
-declared as compatible ranges in `pyproject.toml` for normal tool installation.
+The project is tested on macOS with Python 3.10 and 3.14. Development dependencies are pinned in
+`uv.lock`.
 
 ## License
 

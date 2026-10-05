@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
 from importlib.resources import files
 from pathlib import Path
 
@@ -41,15 +40,13 @@ class WritingAssistant:
         request: str,
         *,
         input_text: str | None = None,
-        history: Sequence[Mapping[str, str]] = (),
     ) -> str:
         if not request.strip():
             raise WritingError("The writing request cannot be empty.")
         style = self._read_style()
         source = input_text or ""
         approximate_limit = self.context_tokens * 4
-        history_size = sum(len(item.get("content", "")) for item in history)
-        if len(style) + len(request) + len(source) + history_size > int(approximate_limit * 0.8):
+        if len(style) + len(request) + len(source) > int(approximate_limit * 0.8):
             raise WritingError(
                 "The style guide and input are too large for the configured context window. "
                 "Shorten the input or increase context_tokens."
@@ -65,7 +62,6 @@ class WritingAssistant:
             user += f"\n\nTEXT TO EDIT:\n{input_text}"
         messages = [
             {"role": "system", "content": system},
-            *history,
             {"role": "user", "content": user},
         ]
         return self.client.chat(messages)

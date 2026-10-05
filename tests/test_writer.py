@@ -50,12 +50,3 @@ def test_oversized_input_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(WritingError, match="too large"):
         writer.generate("Edit", input_text="x" * 4000)
-
-
-def test_oversized_repl_history_is_rejected(tmp_path: Path) -> None:
-    style = tmp_path / "style.md"
-    style.write_text("Clear.", encoding="utf-8")
-    writer = WritingAssistant(FakeClient(), style, 1024)  # type: ignore[arg-type]
-
-    with pytest.raises(WritingError, match="too large"):
-        writer.generate("Continue", history=({"role": "user", "content": "x" * 4000},))

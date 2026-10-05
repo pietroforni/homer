@@ -23,9 +23,10 @@ def test_help_presents_direct_workflow_and_secondary_commands() -> None:
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    assert 'homer "your request"' in result.stdout
+    assert 'homer "what is using port 8000?"' in result.stdout
     assert "write" in result.stdout
     assert "doctor" in result.stdout
+    assert "install-completion" not in result.stdout
     assert "_shell" not in result.stdout
 
 
@@ -33,13 +34,13 @@ def test_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "homer 0.1.0" in result.stdout
+    assert "homer 0.2.0" in result.stdout
 
 
 @pytest.mark.parametrize(
     ("args", "expected"),
     [
-        ([], ["_shell"]),
+        ([], ["--help"]),
         (["where am I"], ["_shell", "where am I"]),
         (["--dry-run", "list files"], ["_shell", "--dry-run", "list files"]),
         (["--model", "small", "list files"], ["--model", "small", "_shell", "list files"]),
@@ -139,46 +140,31 @@ def test_rejected_model_response_is_reported() -> None:
     assert "Request rejected" in all_output(result)
 
 
-def test_no_argument_starts_shell_repl() -> None:
-    with patch("homer.cli._shell_repl") as repl:
-        result = runner.invoke(app, [])
+def test_no_argument_shows_help() -> None:
+    result = runner.invoke(app, [])
 
     assert result.exit_code == 0
-    repl.assert_called_once()
+    assert "Usage:" in result.stdout
+    assert 'homer "what is using port 8000?"' in result.stdout
 
 
-def test_config_show_uses_explicit_file(tmp_path: Path) -> None:
-    style = tmp_path / "style.md"
-    style.write_text("Direct.", encoding="utf-8")
-    config = tmp_path / "config.yaml"
-    config.write_text("model: local-test\nstyle_guide: ./style.md\n", encoding="utf-8")
-
-    result = runner.invoke(app, ["--config", str(config), "config", "show"])
-
-    assert result.exit_code == 0
-    assert "model: local-test" in result.stdout
-    assert str(style) in result.stdout
-
-
-def test_config_show_reports_invalid_config(tmp_path: Path) -> None:
-    config = tmp_path / "config.yaml"
-    config.write_text("unknown: value\n", encoding="utf-8")
-
-    result = runner.invoke(app, ["--config", str(config), "config", "show"])
+@pytest.mark.parametrize("removed", ["--config", "--ollama-host"])
+def test_removed_configuration_options_are_rejected(removed: str) -> None:
+    result = runner.invoke(app, [removed, "value", "doctor"])
 
     assert result.exit_code == 2
-    assert "Configuration error" in all_output(result)
+    assert "No such option" in all_output(result)
 
 
-def test_remote_host_prints_privacy_warning() -> None:
-    with patch("homer.cli.ShellAssistant.propose", return_value=SAFE):
-        result = runner.invoke(
-            app,
-            ["--ollama-host", "https://example.com", "--dry-run", "where am I"],
-        )
+def test_model_override_is_used_for_one_request() -> None:
+    with (
+        patch("homer.cli.ShellAssistant.propose", return_value=SAFE),
+        patch("homer.cli._client") as client,
+    ):
+        result = runner.invoke(app, ["--model", "small-model", "--dry-run", "where am I"])
 
     assert result.exit_code == 0
-    assert "Privacy warning" in all_output(result)
+    client.assert_called_once_with("small-model")
 
 
 def test_write_prints_generated_text() -> None:
@@ -233,6 +219,13 @@ def test_write_force_requires_output() -> None:
 
     assert result.exit_code == 2
     assert "--force requires --output" in all_output(result)
+
+
+def test_write_requires_a_request() -> None:
+    result = runner.invoke(app, ["write"])
+
+    assert result.exit_code == 2
+    assert "Missing argument" in all_output(result)
 
 
 class StatusClient:

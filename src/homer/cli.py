@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 import typer
-from prompt_toolkit import PromptSession
-from prompt_toolkit.history import InMemoryHistory
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -13,34 +11,30 @@ from rich.text import Text
 from typer.core import TyperGroup
 
 from homer import __version__
-from homer.config import (
-    ConfigurationError,
-    LoadedSettings,
-    Settings,
-    is_loopback_host,
-    load_settings,
-)
 from homer.executor import ExecutionError, execute_command
 from homer.ollama import OllamaClient, OllamaError
 from homer.safety import CommandValidationError, RiskLevel, inspect_command
 from homer.shell_assistant import CommandProposal, ShellAssistant
 from homer.writer import WritingAssistant, WritingError
 
-_PUBLIC_COMMANDS = {"write", "doctor", "config"}
-_ROOT_VALUE_OPTIONS = {"--config", "--model", "--ollama-host"}
+DEFAULT_MODEL = "qwen2.5:7b"
+OLLAMA_HOST = "http://localhost:11434"
+TIMEOUT_SECONDS = 60.0
+CONTEXT_TOKENS = 8192
+
+_PUBLIC_COMMANDS = {"write", "doctor"}
+_ROOT_VALUE_OPTIONS = {"--model"}
 _ROOT_EXIT_OPTIONS = {
     "--help",
     "-h",
     "--version",
-    "--install-completion",
-    "--show-completion",
 }
 
 
 def _with_default_command(args: list[str]) -> list[str]:
     """Route bare requests to the hidden shell command while preserving subcommands."""
     if not args:
-        return ["_shell"]
+        return ["--help"]
 
     index = 0
     while index < len(args):
@@ -65,40 +59,21 @@ class DefaultCommandGroup(TyperGroup):
 app = typer.Typer(
     name="homer",
     cls=DefaultCommandGroup,
-    help=(
-        "Turn plain-English requests into reviewed shell commands using local Ollama. "
-        'Run `homer "your request"` or use a command below.'
-    ),
-    epilog=(
-        'Examples: `homer "show the five largest files here"` · '
-        '`homer --dry-run "compress Reports as tar.gz"`'
-    ),
+    help="Turn plain-English requests into shell commands you can review before running.",
+    epilog='Example: `homer "what is using port 8000?"`',
     no_args_is_help=False,
+    add_completion=False,
     subcommand_metavar="[REQUEST] | COMMAND",
     pretty_exceptions_enable=False,
 )
-config_app = typer.Typer(help="Inspect Homer's effective configuration.")
-app.add_typer(config_app, name="config")
 
 console = Console()
 error_console = Console(stderr=True)
 
 
-@dataclass
+@dataclass(frozen=True)
 class AppState:
-    config_path: Path | None
-    model: str | None
-    ollama_host: str | None
-    _loaded: LoadedSettings | None = None
-
-    def loaded(self) -> LoadedSettings:
-        if self._loaded is None:
-            self._loaded = load_settings(
-                self.config_path,
-                model=self.model,
-                ollama_host=self.ollama_host,
-            )
-        return self._loaded
+    model: str
 
 
 def _version(value: bool) -> None:
@@ -110,42 +85,23 @@ def _version(value: bool) -> None:
 @app.callback()
 def main(
     ctx: typer.Context,
-    config: Path | None = typer.Option(None, "--config", help="Path to Homer's YAML config."),
-    model: str | None = typer.Option(None, "--model", help="Override the Ollama model."),
-    ollama_host: str | None = typer.Option(
-        None, "--ollama-host", help="Override the Ollama host URL."
-    ),
+    model: str = typer.Option(DEFAULT_MODEL, "--model", help="Ollama model to use."),
     version: bool = typer.Option(
         False, "--version", callback=_version, is_eager=True, help="Show the version."
     ),
 ) -> None:
-    """Homer runs model requests through Ollama and keeps execution under your control."""
+    """Homer keeps model requests local and command execution under your control."""
     del version
-    ctx.obj = AppState(config, model, ollama_host)
+    ctx.obj = AppState(model)
 
 
-def _settings(ctx: typer.Context) -> Settings:
+def _model(ctx: typer.Context) -> str:
     state: AppState = ctx.ensure_object(AppState)
-    try:
-        loaded = state.loaded()
-    except ConfigurationError as exc:
-        error_console.print(f"[bold red]Configuration error:[/] {exc}")
-        raise typer.Exit(2) from exc
-    if not is_loopback_host(loaded.values.ollama_host):
-        error_console.print(
-            "[bold yellow]Privacy warning:[/] the configured Ollama host is not local; "
-            "prompts and document contents will leave this Mac."
-        )
-    return loaded.values
+    return state.model
 
 
-def _client(settings: Settings) -> OllamaClient:
-    return OllamaClient(
-        settings.ollama_host,
-        settings.model,
-        settings.timeout_seconds,
-        settings.context_tokens,
-    )
+def _client(model: str) -> OllamaClient:
+    return OllamaClient(OLLAMA_HOST, model, TIMEOUT_SECONDS, CONTEXT_TOKENS)
 
 
 def _show_proposal(proposal: CommandProposal) -> None:
@@ -157,9 +113,9 @@ def _show_proposal(proposal: CommandProposal) -> None:
         console.print("[yellow]Model warning:[/]", Text(warning))
 
 
-def _process_shell_request(request: str, settings: Settings, *, dry_run: bool) -> bool:
+def _process_shell_request(request: str, model: str, *, dry_run: bool) -> bool:
     try:
-        with _client(settings) as client:
+        with _client(model) as client:
             proposal = ShellAssistant(client).propose(request)
         _show_proposal(proposal)
         report = inspect_command(proposal.command)
@@ -195,38 +151,16 @@ def _process_shell_request(request: str, settings: Settings, *, dry_run: bool) -
     return code == 0
 
 
-def _shell_repl(settings: Settings, *, dry_run: bool) -> None:
-    console.print("[bold]Homer[/] — describe a terminal task, or use [cyan]/exit[/] to leave.")
-    session: PromptSession[str] = PromptSession(history=InMemoryHistory())
-    while True:
-        try:
-            value = session.prompt("homer> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            console.print("\n[dim]Leaving Homer.[/]")
-            return
-        if not value:
-            continue
-        if value.lower() in {"/exit", "/quit", "exit", "quit"}:
-            return
-        _process_shell_request(value, settings, dry_run=dry_run)
-
-
 @app.command("_shell", hidden=True)
 def shell(
     ctx: typer.Context,
-    request: str | None = typer.Argument(
-        None, help="Natural-language terminal request. Omit to start the REPL."
-    ),
+    request: str = typer.Argument(..., help="Natural-language terminal request."),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Generate and validate, but never execute."
     ),
 ) -> None:
     """Generate a shell command and require confirmation before execution."""
-    settings = _settings(ctx)
-    if request is None:
-        _shell_repl(settings, dry_run=dry_run)
-        return
-    if not _process_shell_request(request, settings, dry_run=dry_run):
+    if not _process_shell_request(request, _model(ctx), dry_run=dry_run):
         raise typer.Exit(1)
 
 
@@ -250,87 +184,58 @@ def _save_output(path: Path, content: str, force: bool) -> None:
 
 def _generate_writing(
     request: str,
-    settings: Settings,
+    model: str,
+    style_guide: Path | None,
     *,
     input_text: str | None = None,
-    history: tuple[dict[str, str], ...] = (),
 ) -> str:
-    with _client(settings) as client:
-        return WritingAssistant(client, settings.style_guide, settings.context_tokens).generate(
-            request, input_text=input_text, history=history
+    with _client(model) as client:
+        return WritingAssistant(client, style_guide, CONTEXT_TOKENS).generate(
+            request, input_text=input_text
         )
 
 
 @app.command()
 def write(
     ctx: typer.Context,
-    request: str | None = typer.Argument(
-        None, help="Drafting or editing request. Omit to start the writing REPL."
-    ),
+    request: str = typer.Argument(..., help="Drafting or editing request."),
     input_path: Path | None = typer.Option(None, "--input", "-i", help="UTF-8 text file to edit."),
     output_path: Path | None = typer.Option(
         None, "--output", "-o", help="Save the result instead of printing it."
     ),
     style_guide: Path | None = typer.Option(
-        None, "--style-guide", help="Override the writing style guide."
+        None, "--style-guide", help="Use a custom writing style guide."
     ),
     force: bool = typer.Option(False, "--force", help="Replace an existing output file."),
 ) -> None:
-    """Draft or edit text with the optional local writing assistant."""
-    settings = _settings(ctx)
-    if style_guide is not None:
-        settings = replace(settings, style_guide=style_guide.expanduser().resolve())
+    """Draft or edit text with Homer's small writing helper."""
     if force and output_path is None:
         raise typer.BadParameter("--force requires --output")
 
     try:
         source = _read_input(input_path.expanduser().resolve()) if input_path else None
-        if request is not None:
-            result = _generate_writing(request, settings, input_text=source)
-            if output_path:
-                target = output_path.expanduser().resolve()
-                _save_output(target, result, force)
-                console.print(f"[green]Saved:[/] {target}")
-            else:
-                console.print(Text(result))
-            return
+        guide = style_guide.expanduser().resolve() if style_guide else None
+        result = _generate_writing(
+            request,
+            _model(ctx),
+            guide,
+            input_text=source,
+        )
+        if output_path:
+            target = output_path.expanduser().resolve()
+            _save_output(target, result, force)
+            console.print(f"[green]Saved:[/] {target}")
+        else:
+            console.print(Text(result))
     except (OllamaError, WritingError) as exc:
         error_console.print(f"[bold red]Writing failed:[/] {exc}")
         raise typer.Exit(1) from exc
 
-    if input_path or output_path:
-        raise typer.BadParameter("--input and --output require a writing request")
-
-    console.print("[bold]Homer writing[/] — enter an instruction, or use [cyan]/exit[/] to leave.")
-    session: PromptSession[str] = PromptSession(history=InMemoryHistory())
-    history: list[dict[str, str]] = []
-    while True:
-        try:
-            value = session.prompt("write> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            console.print("\n[dim]Leaving writing mode.[/]")
-            return
-        if not value:
-            continue
-        if value.lower() in {"/exit", "/quit", "exit", "quit"}:
-            return
-        try:
-            result = _generate_writing(value, settings, history=tuple(history))
-            console.print(Text(result))
-            history.extend(
-                [
-                    {"role": "user", "content": value},
-                    {"role": "assistant", "content": result},
-                ]
-            )
-        except (OllamaError, WritingError) as exc:
-            error_console.print(f"[bold red]Writing failed:[/] {exc}")
-
 
 @app.command()
 def doctor(ctx: typer.Context) -> None:
-    """Check zsh, Ollama, and the configured model."""
-    settings = _settings(ctx)
+    """Check zsh, local Ollama, and the selected model."""
+    model = _model(ctx)
     failures = 0
 
     shell_path = Path("/bin/zsh")
@@ -340,43 +245,18 @@ def doctor(ctx: typer.Context) -> None:
         failures += 1
         error_console.print(f"[red]FAIL[/] shell not found: {shell_path}")
 
-    with _client(settings) as client:
+    with _client(model) as client:
         status = client.status()
     if not status.reachable:
         failures += 1
-        error_console.print(
-            f"[red]FAIL[/] Ollama is unavailable at {settings.ollama_host}: {status.error}"
-        )
+        error_console.print(f"[red]FAIL[/] Ollama is unavailable at {OLLAMA_HOST}: {status.error}")
     else:
-        console.print(f"[green]OK[/] Ollama: {settings.ollama_host}")
-        if settings.model in set(status.models):
-            console.print(f"[green]OK[/] model: {settings.model}")
+        console.print(f"[green]OK[/] Ollama: {OLLAMA_HOST}")
+        if model in set(status.models):
+            console.print(f"[green]OK[/] model: {model}")
         else:
             failures += 1
-            error_console.print(
-                f"[red]FAIL[/] model '{settings.model}' not found. "
-                f"Run: ollama pull {settings.model}"
-            )
+            error_console.print(f"[red]FAIL[/] model '{model}' not found. Run: ollama pull {model}")
 
     if failures:
         raise typer.Exit(1)
-
-
-@config_app.command("show")
-def show_config(ctx: typer.Context) -> None:
-    """Show effective configuration and its source."""
-    state: AppState = ctx.ensure_object(AppState)
-    try:
-        loaded = state.loaded()
-    except ConfigurationError as exc:
-        error_console.print(f"[bold red]Configuration error:[/] {exc}")
-        raise typer.Exit(2) from exc
-    values = loaded.values
-    source = str(loaded.source) if loaded.source else "built-in defaults"
-    style = str(values.style_guide) if values.style_guide else "built-in writing style"
-    typer.echo(f"source: {source}")
-    typer.echo(f"model: {values.model}")
-    typer.echo(f"ollama_host: {values.ollama_host}")
-    typer.echo(f"timeout_seconds: {values.timeout_seconds:g}")
-    typer.echo(f"context_tokens: {values.context_tokens}")
-    typer.echo(f"style_guide: {style}")
