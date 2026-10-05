@@ -7,8 +7,8 @@
   <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17">
     <text x="28" y="88" fill="#79c0ff">$</text>
     <text x="50" y="88" fill="#f0f3f6">homer write "Draft a three-sentence story about Napoleon"</text>
-    <text x="28" y="145" fill="#c9d1d9">Napoleon stood over his map long after Paris had gone quiet.</text>
-    <text x="28" y="181" fill="#c9d1d9">He moved one marker east, paused, and returned it to its place.</text>
-    <text x="28" y="217" fill="#c9d1d9">For once, ambition could wait until morning.</text>
+    <text x="28" y="145" fill="#c9d1d9">Napoleon stood over his map long after Paris had gone quiet. He
+      moved one marker east, paused, and returned it to its place. For once, ambition could wait until 
+      morning.</text>
   </g>
 </svg>
